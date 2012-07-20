@@ -50,7 +50,7 @@ except ImportError:
 
 distutils.core.setup(
     name='uncertainties',
-    version='1.8',
+    version='1.8.1',
     author='Eric O. LEBIGOT (EOL)',
     author_email='eric.lebigot@normalesup.org',
     url='http://packages.python.org/uncertainties/',
@@ -166,6 +166,8 @@ Version history
 
 Main changes:
 
+- 1.8.1: Colin Brosseau changed way ufloat are represented (print)\
+         Uses scientific notation for big or small numbers.
 - 1.8: Compatibility with Python 3.2 added.
 - 1.7.2: Compatibility with Python 2.3, Python 2.4, Jython 2.5.1 and \
          Jython 2.5.2 added.

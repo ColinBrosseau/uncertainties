@@ -232,6 +232,7 @@ import re
 import math
 from math import sqrt, log  # Optimization: no attribute look-up
 import copy
+import numpy as np
 
 # Numerical version:
 __version_info__ = (1, 8)
@@ -918,33 +919,62 @@ class AffineScalarFunc(object):
         return sqrt(sum(
             delta**2 for delta in self.error_components().itervalues()))
 
-    def _general_representation(self, to_string):
+    def _general_representation(self):
         """
-        Uses the to_string() conversion function on both the nominal
-        value and the standard deviation, and returns a string that
-        describes them.
-
-        to_string() is typically repr() or str().
+        Return a string that describes nominal value and the standard
+        deviation. If exponent is < or > that 5, go to scientific notation.
         """
-
-        (nominal_value, std_dev) = (self._nominal_value, self.std_dev())
 
         # String representation:
-
         # Not putting spaces around "+/-" helps with arrays of
         # Variable, as each value with an uncertainty is a
         # block of signs (otherwise, the standard deviation can be
         # mistaken for another element of the array).
 
-        return ("%s+/-%s" % (to_string(nominal_value), to_string(std_dev))
-                if std_dev
-                else to_string(nominal_value))
+        # number of significant figures to print after the error-digit
+        pr = 0
+        er, va = self.std_dev(), self._nominal_value
+        if er == 0. or not np.isfinite(va):
+           # exact
+             return "%g" % va
+        if not np.isfinite(er):
+            return "%g(%g)" % (va, er)
+        # 10^nsig < er < 10^(nsig+1)
+        nsig = int(np.floor(np.log10(er).min()))
+        #  10^vsig < |va| < 10^(vsig+1)
+        if np.fabs(va) > 0:
+             vsig = int(np.floor(np.log10(np.fabs(va)).max()))
+        else:
+             vsig = 0
+        # is er or va reuire exp noation: do so and append es
+        tsig = max(nsig, vsig)
+        if abs(tsig) > 4:
+            er /= 10**tsig
+            nsig -= tsig
+            va /= 10**tsig
+            vsig -= tsig
+            es = "1e%d" % tsig
+        else:
+            es = ""
+        # now the larger of the two is between 1e-5 and 1e5
+        # valid: numer of digits that should appear before the error
+        valid = 1+pr+max(0, vsig-nsig)
+        # digits after the comma
+        nshown = pr-min(0, nsig)
+        # keep as many digits as error has
+        er = round(er, pr-nsig)
+        va = round(va, pr-nsig)
+        if es:
+            s = "(%0.*f+/-%.*f)*%s" % (nshown, va, nshown, er, es)
+        else:
+            s = "%0.*f+/-%.*f" % (nshown, va, nshown, er)            
+        return s
 
     def __repr__(self):
-        return self._general_representation(repr)
+        return self._general_representation()
                     
     def __str__(self):
-        return self._general_representation(str)
+        return self._general_representation()
 
     def position_in_sigmas(self, value):
         """
@@ -1198,7 +1228,7 @@ class Variable(AffineScalarFunc):
         self._std_dev = value
 
     # The following method is overridden so that we can represent the tag:
-    def _general_representation(self, to_string):
+    def _general_representation(self):
         """
         Uses the to_string() conversion function on both the nominal
         value and standard deviation and returns a string that
@@ -1206,14 +1236,14 @@ class Variable(AffineScalarFunc):
 
         to_string() is typically repr() or str().
         """
-        num_repr  = super(Variable, self)._general_representation(to_string)
+        num_repr  = super(Variable, self)._general_representation()
         
         # Optional tag: only full representations (to_string == repr)
         # contain the tag, as the tag is required in order to recreate
         # the variable.  Outputting the tag for regular string ("print
         # x") would be too heavy and produce an unusual representation
         # of a number with uncertainty.
-        return (num_repr if ((self.tag is None) or (to_string != repr))
+        return (num_repr if ((self.tag is None))
                 else "< %s = %s >" % (self.tag, num_repr))
 
     def __hash__(self):
